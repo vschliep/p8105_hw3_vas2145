@@ -1,0 +1,91 @@
+---
+title: "p8105_hw3_vas2145"
+output: github_document
+date: "2023-10-14"
+---
+
+#Set up
+##Loading libraries and setting standards.
+```{r}
+library(tidyverse)
+library(ggridges)
+library(patchwork)
+
+knitr::opts_chunk$set(
+  fig.width = 6,
+  fig.asp = .6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+```
+
+#Problem 1
+##Loading in Dataset
+```{r}
+library(p8105.datasets)
+data("instacart")
+
+instacart =
+  instacart |> 
+  as_tibble()
+```
+
+The `instacart` dataset includes `r ncol(instacart)` variables of `r nrow(instacart)` observations. The datset includes information such as `order_id`, which is the order number assigned to a particular user, identified by `user_id`. It includes timing of the order, including the day of week (`order_dow), the hour of the order (`order_hour_od_day`) and the amount of time since a previous order was placed by the user (`days_since_prior_order`). It also includes the `product_name`, the product `aisle` and the `department` the product came from. In total, there are 134 aisles, with the fresh vegetables and fresh fruits aisles being the mostly highly ordered from.
+
+```{r}
+instacart |> 
+  count(aisle_id)
+```
+
+```{r}
+instacart |> 
+  count(aisle_id) |> 
+  arrange(desc(n))
+```
+
+Plot showing the number of items ordered from each aisle:
+
+```{r}
+instacart |> 
+  count(aisle) |> 
+  filter(n > 10000) |> 
+  mutate(aisle = fct_reorder(aisle, n)) |> 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle", y = "Number of Items") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+```
+
+A table of the three most popular items ordered from "packaged vegetables fruits", "baking ingredients" and "dog food care" aisles. Each of the products from "packaged vegetables fruits" are substantially more popular than the most popular items from "baking ingredients" and "dog food care" aisles.
+```{r}
+instacart |> 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) |> 
+  group_by(aisle) |> 
+  count(product_name) |> 
+  mutate(rank = min_rank(desc(n))) |> 
+  filter(rank < 4) |> 
+  arrange(desc(n)) |>
+  knitr::kable()
+```
+
+On average, ustomers generally order "pink lady apples" earlier in the day than "Coffee Ice Cream," based on the table below.
+```{r}
+instacart |>
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) |>
+  group_by(product_name, order_dow) |>
+  summarize(mean_hour = mean(order_hour_of_day)) |>
+  pivot_wider(
+    names_from = order_dow, 
+    values_from = mean_hour) |>
+  knitr::kable(digits = 2)
+```
+
