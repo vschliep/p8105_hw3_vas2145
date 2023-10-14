@@ -181,3 +181,128 @@ ggplot(brfss_ny_data, aes(x = response, y = data_value)) +
 
 
 Problem 3
+
+#Import and clean datasets
+
+```{r}
+demo_data=
+  read_csv(file = "data/nhanes_covar.csv", skip = 4) |> 
+  janitor::clean_names() |> 
+  filter(age >= 21) |> 
+  mutate(
+    sex = recode(sex, "1" = "male", "2" = "female"),
+    education = recode(education, "1" = "less than high school", "2" = "high school equivalent", "3" = "more than high school")) |> 
+  mutate(
+    sex = factor(sex),
+    education = factor(education)) |> 
+  drop_na()
+```
+
+```{r}
+accel_data =
+  read_csv(file = "data/nhanes_accel.csv") |> 
+  janitor::clean_names()
+```
+
+#merge the datasets:
+```{r}
+merged_data =
+  left_join(demo_data, accel_data, by = "seqn")
+```
+
+#Reader-friendly table for the number of men and women in each education category:
+
+```{r}
+table_education_sex = merged_data |> 
+  group_by(sex, education) |> 
+  summarise(count = n(), .groups = "drop") |> 
+  pivot_wider(names_from = sex, values_from = count)
+  knitr::kable(table_education_sex, caption = "Number of Men and Women in Each Education Category")
+```
+
+Most respondents had `more than high school` education, with females having a greater amount of `more than high school` education than males.
+
+
+#create a visualization of the age distributions for men and women in each education category
+```{r}
+merged_data |> 
+  ggplot(aes(x = education, y = age, fill = sex)) +
+    geom_point(alpha = .5) +
+    labs(title = "Age Distribution by Sex and Level of Education",
+         x = "Level of Education",
+         y = "Age") +
+   theme_minimal()
+```
+
+```{r}
+merged_data |> 
+  ggplot(aes(x = education, y = age, fill = sex)) +
+    geom_boxplot() +
+    labs(title = "Age Distribution by Sex and Level of Education",
+         x = "Level of Education",
+         y = "Age") +
+   theme_minimal()
+```
+
+Generally, females with more than a high school education are, on average, younger than females with a high school equivalent or less than a high school education, whereas males with less than a high school education are, on average, older than those with a high school equivalent or more than a high school education.
+
+
+#aggregate across minutes to create a total activity variable for each participant:
+
+```{r}
+total_activity_data = merged_data |> 
+  mutate(
+    total_activity = rowSums(across(c(min1:min45))))
+```
+
+#Plot of total activities (y-axis) against age (x-axis), comparing men to women with separate panels for each education level and a trend line to illustrate differences
+
+```{r}
+ggplot(total_activity_data, aes(x = age, y = total_activity, color = sex)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~ education) +
+  labs(title = "Total Activity by Sex and Level of Education",
+       x = "Age",
+       y = "Total Activity")
+```
+
+Across all levels of education, total activity levels decrease from age 20 to age 80. For women, activity levels typically increase between ages 40 and 50, while men typically have decreasing levels of activity between this period.
+
+
+#three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex
+```{r}
+time_course_data = total_activity_data |> 
+  group_by(education, sex) |> 
+  summarize(across(starts_with("min"), ~mean(.), .names = "mean_{.col}")) |> 
+  pivot_longer(
+    cols = starts_with ("mean"),
+    names_to = "time",
+    values_to = "mean") |> 
+  mutate(time = substring(time, 9),
+         time = as.numeric(time))
+```
+
+```{r}
+time_course_data |> 
+  ggplot(aes(x = time, y = mean, color = sex)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(. ~ education) +
+  labs(title = "24-hour Activity Time Course by Education Level and Sex",
+       x = "Time(min)",
+       y = "Mean Activity")
+```
+
+```{r}
+time_course_data |> 
+  ggplot(aes(x = time, y = mean, color = sex)) +
+  geom_point(alpha = .5, size = .2) +
+  geom_smooth() +
+  facet_wrap(. ~ education) +
+  labs(title = "24-hour Activity by Education Level and Sex",
+       x = "Time(min)",
+       y = "Mean Activity")
+```
+
+For all levels of education, activity dips in the morning, before increasing at midday. Those with less than a high school education have, on average, greater levels of activity at most time points within the day, with those with a high school equivalent education having, on average, the lowest amount of activity level.
